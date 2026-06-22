@@ -162,9 +162,9 @@ highlight_df <- FF %>%
 FF %>%
   ggplot(aes(x = mean_vrr, y = val)) +
   geom_point(aes(size = std_vrr, color = W_minus_P), alpha = 0.5) +
-  scale_color_gradient2(low = "dodgerblue3", 
-                        mid = "forestgreen", 
-                        high = "yellow",
+  scale_color_gradient2(low = "red",
+                        mid = "white", 
+                        high = "darkgreen",
                         midpoint = 10) +
   scale_size_continuous(breaks = c(0.05, 0.10, 0.15),
                         range = c(1, 5),
