@@ -104,11 +104,18 @@ preds %>%
 # 02
 preds %>%
   ggplot(aes(x = Predicted, y = Observed)) +
-  geom_point(alpha = 0.5) +
-  geom_abline(slope = 1, intercept = 0, color = "firebrick2") +
+  geom_hline(yintercept = c(0.4, 1.0), colour = "grey82", linewidth = .1) +
+  geom_vline(xintercept = c(0.4, 1.0), colour = "grey82", linewidth = .1) +
+  geom_point(alpha = 0.1, size = 2) +
+  geom_abline(slope = 1, intercept = 0, color = "firebrick2", linewidth = .5) +
   labs(subtitle = "Posterior Predictive Check",
-       x = "Predicted OA",
-       y = "Observed OA") 
+       x = "Predicted Overall Accuracy",
+       y = "Observed Overall Aaccuracy") +
+  scale_x_continuous(limits = c(0.4, 1.0), breaks = seq(0.4, 1.0, by = 0.2)) +
+  scale_y_continuous(limits = c(0.4, 1.0), breaks = seq(0.4, 1.0, by = 0.2)) +
+  theme(plot.subtitle = element_text(hjust = 0.6, colour = "grey45", size = 14),
+        axis.text.y = element_text(size = 9),
+        axis.text.x = element_text(size = 9))
 
 flab <- 
   preds %>%
@@ -167,7 +174,6 @@ get_RANDOMstatEFF <- function(inlamodel) {
 random_effects_sum <- get_RANDOMstatEFF(SAVinla)
 random_effects_sum$stat_EFF
 random_effects_sum$non_stat_EFF 
-
 
 # 2) Marginals
 get_RANDOMmarginals <- function(inlamodel, data) {
@@ -276,7 +282,7 @@ p_ci_bars <-
                  height = 0.2, linewidth = 0.3, color = "grey35") +
   geom_text(nstatEFF, mapping = aes(x, y, label = "*"), 
             col = "firebrick2", size = 5, vjust = 0.8) +
-  labs(x = "Posterior effect (mean with 95% CI)", y = "Smoothing parameter") +
+  labs(x = "Posterior effect", y = "Order::Window size") +
   scale_x_continuous(expand = expansion(mult = c(0.05, 0.05))) +
   theme_minimal(base_family = "Lato") +
   theme(
@@ -344,26 +350,34 @@ p_compact <-
          is_significant = ifelse(lower > 0 | upper < 0, "Significant", "Non-significant")) %>%
   ggplot(aes(x = mean, y = reorder(effect, effect_num), color = is_significant)) +
   geom_vline(xintercept = 0, col = "grey60", linewidth = 0.2, linetype = "dashed") +
-  geom_point(size = 1.5) +
-  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.2, linewidth = 0.5) +
-  scale_color_manual(values = c("Significant" = "firebrick2", "Non-significant" = "grey35")) +
-  labs(x = "Posterior effect (mean with 95% CI)", 
-       y = "Smoothing parameter",
-       color = "95% CI excludes 0") +
-  theme_minimal(base_family = "Lato") +
+  geom_point(size = 1.7) +
+  scale_x_continuous(expand = expansion(mult = c(0.02, 0.02)), breaks = c(-0.1, -0.05, 0, 0.05)) +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, linewidth = 0.3) +
+  scale_color_manual(
+    values = c("Significant" = "grey35", "Non-significant" = "firebrick2"),
+    breaks = c("Significant", "Non-significant")) +
+  labs(x = "Posterior effect (mean with 95% HDI)", 
+       y = "Order::Window size",
+       color = "95% HDI excludes 0") +
+  #theme_minimal(base_family = "Lato") +
   theme(
-    legend.position = "bottom",
-    panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(color = "grey90", linewidth = 0.2),
-    axis.text = element_text(size = 8)
+    legend.position = "top",
+    #panel.grid.minor = element_blank(),
+    #panel.grid.major = element_line(color = "grey90", linewidth = 0.2),
+    legend.box.margin = margin(0, 0, -5, 0),  
+    legend.margin = margin(0, 0, 0, 0),  
+    axis.title.x = element_text(size = 13),
+    axis.title.y = element_text(size = 13),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 8)
   )
 
 # Display the plots
 p_ci_bars    # Simple interval bars
 p_ci_shaded  # Densities with shaded intervals
-p_compact    # Compact summary
+p_compact    # Compact 
 
-# ONLY SHADED ONE IS NEEDED!
+# Shaded for manuscript
 g <- ggplotGrob(p_ci_shaded)
 strip_positions <- which(g$layout$name %in% grep("strip-t", g$layout$name, value = TRUE))
 
@@ -387,6 +401,9 @@ grid.text(
   gp = gpar(col = "grey45", cex = 1, fontface = "bold", family = "Lato black")
 )
 
+# Minor REVISION(compact one is required!!!):
+p_compact
+
 ## ----------------------------------------------------------------------------------
 ## ------------------- stat EFF "Forests"::"Species" = influencing OA "significantly"
 # Get credible intervals for Forest_Species
@@ -394,149 +411,140 @@ forest_species_ci <- random_effects_ci %>%
   filter(group == "Forest_Species") %>%
   mutate(effect = str_replace(effect, "_", "::"))
 
-statEFF <- random_effects_sum$stat_EFF %>%
-  filter(effect == "Forest_Species")
-stateffect <- data.frame(effect = statEFF[!is.na(statEFF)],
-                         x = random_effects_ci %>%
-                           filter(effect == "b_0") %>%
-                           pull(mean) %>% mean,
-                         y = 2,
-                         group = "Forest_Species")
-statEFF <- data.frame(effect = random_effects_ci %>%
-                        filter(group == "Forest_Species") %>%
-                        pull(effect) %>% unique() %>%
-                        as.character(),
-                      x = NA,
-                      y = NA,
-                      group = "Forest_Species")
-statEFF <- statEFF %>%
-  left_join(stateffect, by = "effect", suffix = c("", ".new")) %>%
-  mutate(x = ifelse(is.na(x.new), x, x.new),
-         y = ifelse(is.na(y.new), y, y.new)) %>%
-  select(effect, x, y, group) %>%
-  mutate(effect = str_replace(effect, "_", "::"))
-
-## Plot random effects "Forest" :: "Species" interaction with shaded 95% CI
-p_forest_species <- 
-  random_effects_with_ci %>%
-  filter(group == "Forest_Species") %>%
-  mutate(effect = str_replace(effect, "_", "::")) %>%
-  ggplot(aes(x, y)) +
-  # Vertical line at 0
-  geom_vline(aes(xintercept = 0, col = "0.0"), linewidth = .1) +
-  # Shade the 95% credible interval
-  geom_rect(data = . %>% distinct(effect, .keep_all = TRUE),
-            aes(xmin = lower, xmax = upper, ymin = 0, ymax = Inf),
-            fill = "grey85", alpha = 0.3, inherit.aes = FALSE) +
-  # Add density line
-  geom_line(col = "grey35", linewidth = .1) +
-  # Add mean point
-  geom_point(data = . %>% distinct(effect, .keep_all = TRUE),
-             aes(x = mean, y = 0.2), 
-             size = 1, color = "firebrick2", shape = 16) +
-  # Add asterisk for significant effects
-  geom_text(statEFF, mapping = aes(x, y, label = "*"), col = "firebrick2", size = 5) +
-  scale_color_manual(values = "firebrick2", labels = "0.0") +
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.01))) +
-  scale_x_continuous(expand = expansion(mult = c(0.0, 0.0))) +
-  labs(x = "Posterior effect") +
-  facet_wrap(~ effect, ncol = 4) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.text.y = element_blank(),
-    axis.title.y = element_blank(),
-    axis.title.x = element_text(size = 11),
-    legend.position = c(.76, .1),
-    legend.title = element_blank(),
-    legend.key.width = unit(1, "mm"),
-    legend.background = element_rect(fill = "grey98", colour = "transparent"),
-    strip.text = element_text(size = 9),
-    panel.background = element_rect(fill = "grey98", color = NA)
+forest_species_ci <- forest_species_ci %>%
+  mutate(
+    effect_num = row_number(),  # Add numeric order for plotting
+    is_significant = ifelse(lower > 0 | upper < 0, "Significant", "Non-significant")
   )
 
-## Two-panel plot: Forest and Species with shaded 95% CI
+## Plot random effects "Forest" :: "Species" interaction with errorbars
+p_forest_species <- 
+  forest_species_ci %>%
+  ggplot(aes(x = mean, y = reorder(effect, effect_num), color = is_significant)) +
+  # Vertical line at 0
+  geom_vline(xintercept = 0, col = "grey60", linewidth = 0.2, linetype = "dashed") +
+  # Points for mean effects
+  geom_point(size = 2) +
+  # Errorbars for 95% HDI
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, linewidth = 0.3) +
+  # Color scale with specific order
+  scale_color_manual(
+    values = c("Significant" = "grey35", "Non-significant" = "firebrick2"),
+    breaks = c("Significant", "Non-significant")
+  ) +
+  # X-axis breaks - adjust based on your data range
+  scale_x_continuous(
+    expand = expansion(mult = c(0.02, 0.02)),
+    breaks = c(-0.3, -0.2, -0.1, 0, 0.1, 0.2)  
+  ) +
+  # Labels
+  labs(x = "Posterior effect (mean with 95% HDI)", 
+       y = "Forest::Species",
+       color = "95% HDI excludes 0") +
+  # Theme
+  theme(
+    legend.position = "top",
+    legend.box.margin = margin(0, 30, -5, 0),  
+    legend.margin = margin(0, 0, 0, 0),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    axis.title.x = element_text(size = 13),
+    axis.title.y = element_text(size = 13),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 11)
+  )
+
+## Forest and Species with errorbars
 # Get credible intervals for Forest and Species
 forest_ci <- random_effects_ci %>% filter(group == "Forest")
 species_ci <- random_effects_ci %>% filter(group == "Species")
 
-# Get full marginals for Forest and Species
-forest_marginals <- random_effects_with_ci %>% filter(group == "Forest")
-species_marginals <- random_effects_with_ci %>% filter(group == "Species")
-
-# Get b_0 mean for reference
-b0_mean <- random_effects_ci %>%
-  filter(effect == "b_0") %>%
-  pull(mean) %>% mean()
-
-# Panel A: Forest effects
-A <- 
-  forest_marginals %>%
-  ggplot(aes(x, y)) +
-  # Vertical line at b_0 mean
-  geom_vline(xintercept = b0_mean, col = "firebrick2", linewidth = .1) +
-  # Shade the 95% credible interval
-  geom_rect(data = forest_ci,
-            aes(xmin = lower, xmax = upper, ymin = 0, ymax = Inf),
-            fill = "grey85", alpha = 0.3, inherit.aes = FALSE) +
-  # Add density line
-  geom_line(col = "grey35", linewidth = .1) +
-  # Add mean point
-  geom_point(data = forest_ci,
-             aes(x = mean, y = 0.1), 
-             size = 1, color = "firebrick2", shape = 16) +
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.01))) +
-  scale_x_continuous(expand = expansion(mult = c(0.0, 0.0))) +
-  labs(x = "Posterior effect", tag = "(a)") +
-  facet_wrap(~ effect, ncol = 3) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.text.y = element_blank(),
-    axis.title.y = element_blank(),
-    axis.title.x = element_text(size = 11),
-    plot.tag = element_text(colour = "grey25", size = 13, hjust = .5),
-    plot.tag.position = "topright",
-    strip.text = element_text(size = 9),
-    panel.background = element_rect(fill = "grey98", color = NA)
+# Add significance labels and effect numbers for ordering
+forest_ci <- forest_ci %>%
+  mutate(
+    effect_num = row_number(),
+    is_significant = ifelse(lower > 0 | upper < 0, "Significant", "Non-significant")
   )
 
-# Panel B: Species effects
-B <- 
-  species_marginals %>%
-  ggplot(aes(x, y)) +
-  # Vertical line at b_0 mean
-  geom_vline(aes(xintercept = b0_mean, col = "0.0"), linewidth = .1) +
-  # Shade the 95% credible interval
-  geom_rect(data = species_ci,
-            aes(xmin = lower, xmax = upper, ymin = 0, ymax = Inf),
-            fill = "grey85", alpha = 0.3, inherit.aes = FALSE) +
-  # Add density line
-  geom_line(col = "grey35", linewidth = .1) +
-  # Add mean point
-  geom_point(data = species_ci,
-             aes(x = mean, y = 0.3), 
-             size = 1, color = "firebrick2", shape = 16) +
-  scale_color_manual(values = "firebrick2", labels = "0.0") +
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.01))) +
-  scale_x_continuous(expand = expansion(mult = c(0.0, 0.0))) +
-  labs(x = "Posterior effect", tag = "(b)") +
-  facet_wrap(~ effect, ncol = 3) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.text.y = element_blank(),
-    axis.title.y = element_blank(),
-    axis.title.x = element_text(size = 11),
-    legend.position = c(.83, .07),
-    legend.background = element_rect(fill = "grey98", colour = "transparent"), 
-    legend.title = element_blank(),
-    legend.key.width = unit(1, "mm"),
-    plot.tag = element_text(colour = "grey25", size = 13, hjust = .5),
-    plot.tag.position = "topright",
-    strip.text = element_text(size = 9),
-    panel.background = element_rect(fill = "grey98", color = NA)
+species_ci <- species_ci %>%
+  mutate(
+    effect_num = row_number(),
+    is_significant = ifelse(lower > 0 | upper < 0, "Significant", "Non-significant")
   )
 
-# Arrange the two panels
-grid.arrange(A, B, ncol = 1, heights = c(1, 4))
+# Combine the data
+combined_ci <- bind_rows(
+  forest_ci %>% mutate(category = "Forest"),
+  species_ci %>% mutate(category = "Species")
+)
+
+# Create effect_ordered with proper labels
+combined_ci <- combined_ci %>%
+  mutate(
+    # Create display labels - ensure effect is character
+    display_label = ifelse(category == "Forest", 
+                           paste0(as.character(effect), " (Forest)"), 
+                           as.character(effect)),
+    # Create ordering: first Forests (by effect), then Species (by effect_num)
+    order_group = ifelse(category == "Forest", 1, 2),
+    # For sorting: Forests by effect (G, M, S), Species by effect_num
+    sort_order = ifelse(category == "Forest", 
+                        match(as.character(effect), c("G", "M", "S")), 
+                        effect_num + 10)
+  ) %>%
+  arrange(order_group, sort_order) %>%
+  mutate(
+    # Create a factor with the desired order (reverse for top-to-bottom display)
+    effect_ordered = factor(display_label, levels = rev(display_label))
+  )
+
+# Darker grey background
+forest_rect <- data.frame(
+  xmin = -Inf,
+  xmax = Inf,
+  ymin = 17.5,  
+  ymax = 20.5,  
+  fill = "grey95"
+)
+
+# Create the plot
+p_combined <- 
+  combined_ci %>%
+  ggplot(aes(x = mean, y = effect_ordered, color = is_significant)) +
+  geom_vline(xintercept = 0, col = "grey60", linewidth = 0.2, linetype = "dashed") +
+  # Add rectangle behind Forest group
+  geom_rect(data = forest_rect,
+            aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+            fill = "grey65",  
+            alpha = 0.3, inherit.aes = FALSE) +
+  geom_point(size = 2) +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.5, linewidth = 0.3) +
+  scale_color_manual(
+    values = c("Significant" = "grey35", "Non-significant" = "firebrick2"),
+    breaks = c("Significant", "Non-significant")
+  ) +
+  scale_x_continuous(
+    expand = expansion(mult = c(0.02, 0.02)),
+    breaks = seq(-0.2, 1.0, by = 0.2)
+  ) +
+  labs(x = "Posterior effect (mean with 95% HDI)", 
+       y = "Species and Forest",
+       color = "95% HDI excludes 0") +
+  theme(
+    legend.position = "top",
+    legend.justification = "left",
+    legend.box.margin = margin(0, 30, -5, 0),  
+    legend.margin = margin(0, 0, 0, 0),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    axis.title.x = element_text(size = 13),
+    axis.title.y = element_text(size = 13),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10)
+  )
+
+# Forest and Species
+p_combined
 
 # Forest_Species interaction 
 p_forest_species
@@ -565,9 +573,9 @@ calc_element("axis.text.y", theme_get()) # -> "grey50"
 
 p1 <-
   ggplot(SAVM, aes(y = ID, x = MEAN, group = 1)) +
-  geom_vline(xintercept = round(pred_MEAN, 2), size = .1, col = "grey65") +
-  geom_ribbon(aes(xmin = Q_0025, xmax = Q_0975), fill = "grey75", alpha = 0.2) +  
-  geom_line(color = "firebrick2", size = .2) + 
+  geom_vline(xintercept = round(pred_MEAN, 2), col = "grey60", linewidth = 0.2, linetype = "dashed") +
+  geom_ribbon(aes(xmin = Q_0025, xmax = Q_0975), fill = "firebrick2", alpha = 0.05) +  
+  geom_errorbarh(aes(xmin =  Q_0025, xmax = Q_0975), height = 0.5, linewidth = 0.3, colour = "firebrick2", alpha = .5) +
   geom_point(color = "firebrick2", size = 3, shape = 16, alpha = .5) +
   labs(y = "Order::Window size", x = "Overall Accuracy") +
   scale_x_continuous(expand = expansion(mult = c(0.0, 0.0)), 
@@ -600,5 +608,3 @@ require(patchwork)
 layout <- "
 AAAAAAAAB"
 p1 + p2 + plot_layout(design = layout)
-
-
