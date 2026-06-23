@@ -401,7 +401,7 @@ grid.text(
   gp = gpar(col = "grey45", cex = 1, fontface = "bold", family = "Lato black")
 )
 
-# Minor REVISION(compact one is required!!!):
+# Minor REVISION (compact one is required!!!):
 p_compact
 
 ## ----------------------------------------------------------------------------------
